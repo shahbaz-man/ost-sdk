@@ -1,0 +1,3 @@
+rootProject.name = 'ost-sdk'
+include 'ost-apache-provider'
+
