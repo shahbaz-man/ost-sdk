@@ -17,7 +17,7 @@ interface NetworkProvider {
      * Low-level method that sends a POST request with the given parameters, and returns
      * the response as a string.
      */
-    fun doPost(url: String, body: String, contentType: String): String
+    fun doPost(url: String, params: Map<String, String>): String
 
     /**
      * Low-level method that sends a GET request with the given parameters, and returns

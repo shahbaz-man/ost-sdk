@@ -11,21 +11,30 @@
 
 package com.asdev.ost.sdk.network
 
-import org.apache.http.client.methods.HttpGet
-import org.apache.http.client.methods.HttpPost
-import org.apache.http.entity.ContentType
-import org.apache.http.entity.StringEntity
-import org.apache.http.impl.client.HttpClientBuilder
+import org.apache.hc.client5.http.classic.methods.HttpGet
+import org.apache.hc.client5.http.classic.methods.HttpPost
+import org.apache.hc.client5.http.entity.UrlEncodedFormEntity
+import org.apache.hc.client5.http.impl.classic.HttpClientBuilder
+import org.apache.hc.core5.http.NameValuePair
+import org.apache.hc.core5.http.message.BasicNameValuePair
 import java.io.ByteArrayOutputStream
 
 object ApacheNetworkProvider: NetworkProvider {
 
     private val client = HttpClientBuilder.create().build()
 
-    override fun doPost(url: String, body: String, contentType: String): String {
+    override fun doPost(url: String, params: Map<String, String>): String {
         val request = HttpPost(url)
-        // set the request entity
-        request.entity = StringEntity(body, ContentType.getByMimeType(contentType))
+
+        val pairs = mutableListOf<NameValuePair>()
+        for(item in params) {
+            pairs.add(BasicNameValuePair(item.key, item.value))
+        }
+
+        val entity = UrlEncodedFormEntity(pairs, Charsets.UTF_8)
+
+        request.entity = entity
+
         // execute
         val response = client.execute(request)
         // read the response as a string of UTF8

@@ -11,7 +11,6 @@
 
 package com.asdev.ost.sdk
 
-import com.asdev.ost.sdk.models.OSTAddress
 import com.asdev.ost.sdk.models.OSTUser
 import com.asdev.ost.sdk.network.NetworkProvider
 import com.google.gson.JsonObject
@@ -19,12 +18,18 @@ import com.google.gson.JsonParser
 import com.google.gson.stream.JsonReader
 import org.apache.commons.codec.binary.Hex
 import java.io.StringReader
+import java.net.URLEncoder
 import java.time.Instant
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 
 internal const val BASE_API_URL = "https://sandboxapi.ost.com/v1"
-internal const val CONTENT_TYPE_FORM = "application/x-www-form-urlencoded"
+
+const val ORDER_BY_TIME = "created"
+const val ORDER_BY_NAME = "name"
+
+const val ORDER_ASC = "asc"
+const val ORDER_DESC = "desc"
 
 /**
  * The class serving as an entry point for the OSTSdk.
@@ -67,7 +72,7 @@ object OSTSdk {
     /**
      * Signs the input signature and returns the result.
      */
-    fun signString(input: String): String {
+    private fun signString(input: String): String {
         val bytes = mac.doFinal(input.toByteArray(Charsets.UTF_8))
         return Hex.encodeHexString(bytes)
     }
@@ -76,22 +81,25 @@ object OSTSdk {
         // add in the required params
         params.apply {
             put("api_key", apiKey!!)
-            put("request_timestamp", "1526605283")
+            put("request_timestamp", Instant.now().epochSecond.toString())
             // add the signature after it is calculated
         }
 
         val paramsSorted = params.toSortedMap()
-        var parameterString = paramsSorted.entries.joinToString (separator = "&") { "${it.key}=${it.value}" } // todo: postfix with a &
-        // sign with the url + parameters
-        val signed = signString("$urlPostfix/?$parameterString")
-        // append the signed string a signature
-        parameterString += "&signature=$signed"
+        val parameterString = paramsSorted.entries.joinToString (separator = "&")
+
+        val signing = "$urlPostfix?$parameterString"
+
+        val signed = signString(signing)
+
+        val body = paramsSorted.toMutableMap()
+        body["signature"] = signed
+
         // post directly with the parameters
-        val postBody = parameterString // todo: encode as a url form
         val postURL = BASE_API_URL + urlPostfix
 
         // send the actual post
-        val responseString = networkProvider!!.doPost(postURL, postBody, CONTENT_TYPE_FORM)
+        val responseString = networkProvider!!.doPost(postURL, body)
         val jsonObj = jsonParser.parse(JsonReader(StringReader(responseString)).apply { isLenient = true }).asJsonObject
 
         // check if there is an error
@@ -113,8 +121,8 @@ object OSTSdk {
         }
 
         val paramsSorted = params.toSortedMap()
-        var parameterString = paramsSorted.entries.joinToString (separator = "&") { "${it.key}=${it.value}" } // todo: postfix with a &
-        val signingString = "$urlPostfix?$parameterString"
+        var parameterString = paramsSorted.entries.joinToString (separator = "&", prefix = "?") { "${it.key}=${it.value}" } // todo: postfix with a &
+        val signingString = "$urlPostfix$parameterString"
         // sign with the url + parameters
         val signed = signString(signingString)
         // append the signed string a signature
@@ -143,31 +151,25 @@ object OSTSdk {
         /**
          * Creates a user on the OST backend with the specified name.
          */
-        fun create(nameIn: String): OSTUser {
+        fun create(nameIn: String?): OSTUser {
             ensureReady()
 
             // add in the user specific params
-            val params = mutableMapOf("name" to nameIn)
+            val params = mutableMapOf<String, String>()
+
+            nameIn?.let {
+                params.put("name", URLEncoder.encode(nameIn, "UTF8"))
+            }
+
             val urlPostfix = "/users"
 
             // will autocatch unsuccessful responses
             val json = doPost(urlPostfix, params)
             // data will contain a 'user' obj
             val userJson = json["data"].asJsonObject["user"].asJsonObject
-            // json obj contains:
-            // id
-            // addresses
-            // name
-            // airdropped_tokens
-            // token_balance
-            val id = userJson["id"].asString
-            val addresses = userJson["addresses"].asJsonArray
-            val name = userJson["name"].asString // name == nameIn
-            val airdropped_tokens = userJson["airdropped_tokens"].asLong
-            val token_balance = userJson["token_balance"].asLong
 
             // create and return an OSTUser object
-            return OSTUser(id, OSTAddress.fromJsonArray(addresses), name, airdropped_tokens, token_balance)
+            return OSTUser.fromJsonObject(userJson)
         }
 
         fun update(toUpdate: OSTUser) {
@@ -175,22 +177,53 @@ object OSTSdk {
 
         }
 
-        fun get(id: String) {
+        fun get(id: String): OSTUser {
             ensureReady()
 
             // the postfix contains the /users/ + the id of the user to retrieve
             val urlPostfix = "/users/$id"
             val response = doGet(urlPostfix, mutableMapOf())
+
+            // get user data part
+            val userJson = response.getAsJsonObject("data").getAsJsonObject("user")
+            return OSTUser.fromJsonObject(userJson)
         }
 
-        fun list(ids: Array<String>? = null) {
+        fun list(page_no: Int = 1, limit: Int = 10, order_by: String = ORDER_BY_TIME, order: String = ORDER_DESC): List<OSTUser> {
             ensureReady()
 
+            val urlPostfix = "/users/"
+            val params = mutableMapOf<String, String>()
+
+            params.apply {
+                put("page_no", page_no.toString())
+                put("limit", limit.toString())
+                put("order_by", order_by)
+                put("order", order)
+            }
+
+            val json = doGet(urlPostfix, params)
+
+            val users = mutableListOf<OSTUser>()
+
+            // get the users json array
+            val usersJson = json.getAsJsonObject("data").getAsJsonArray("users")
+            for(userRaw in usersJson) {
+                val userJson = userRaw.asJsonObject
+                val user = OSTUser.fromJsonObject(userJson)
+                users.add(user)
+            }
+
+            return users
         }
 
     }
 
     object Transactions {
+
+    }
+
+    object Actions {
 
     }
 }
