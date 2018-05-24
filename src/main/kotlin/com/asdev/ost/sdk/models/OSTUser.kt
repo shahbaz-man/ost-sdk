@@ -30,7 +30,7 @@ data class OSTAddress(val chainId: Long, val address: String) {
 data class OSTUser(
         var id: String?,
         var address: OSTAddress?,
-        var name: String,
+        var name: String?,
         var airdropped_tokens: Long,
         var token_balance: Long) {
 
@@ -40,7 +40,7 @@ data class OSTUser(
             return OSTUser(
                     id = json["id"].asString,
                     address = OSTAddress.fromJsonArray(json["addresses"].asJsonArray),
-                    name = json["name"].asString,
+                    name = if(json["name"].isJsonNull) null else json["name"].asString,
                     airdropped_tokens = json["airdropped_tokens"].asString.toLong(),
                     token_balance = json["token_balance"].asString.toLong()
             )
