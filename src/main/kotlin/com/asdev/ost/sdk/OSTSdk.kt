@@ -11,6 +11,8 @@
 
 package com.asdev.ost.sdk
 
+import com.asdev.ost.sdk.models.OSTAction
+import com.asdev.ost.sdk.models.OSTTransaction
 import com.asdev.ost.sdk.models.OSTUser
 import com.asdev.ost.sdk.network.NetworkProvider
 import com.google.gson.JsonObject
@@ -77,6 +79,11 @@ object OSTSdk {
         return Hex.encodeHexString(bytes)
     }
 
+    /**
+     * Performs a POST request with the given parameters, automatically applying
+     * the required OST parameters, including the API key, request timestamp,
+     * and signature.
+     */
     private fun doPost(urlPostfix: String, params: MutableMap<String, String>): JsonObject {
         // add in the required params
         params.apply {
@@ -112,6 +119,11 @@ object OSTSdk {
         return jsonObj
     }
 
+    /**
+     * Performs a GET request with the given parameters, automatically applying
+     * the required OST parameters, including the API key, request timestmap,
+     * and signature.
+     */
     private fun doGet(urlPostfix: String, params: MutableMap<String, String>): JsonObject {
         // add in the required params
         params.apply {
@@ -144,7 +156,7 @@ object OSTSdk {
     }
 
     /**
-     * Class pertaining specifically to any user API actions.
+     * Class pertaining specifically to any User API actions.
      */
     object Users {
 
@@ -177,6 +189,9 @@ object OSTSdk {
 
         }
 
+        /**
+         * Retrieves the OSTUser with the given id.
+         */
         fun get(id: String): OSTUser {
             ensureReady()
 
@@ -189,6 +204,9 @@ object OSTSdk {
             return OSTUser.fromJsonObject(userJson)
         }
 
+        /**
+         * Returns a list of all OST users, with the supplied parameters.
+         */
         fun list(page_no: Int = 1, limit: Int = 10, order_by: String = ORDER_BY_TIME, order: String = ORDER_DESC): List<OSTUser> {
             ensureReady()
 
@@ -219,11 +237,107 @@ object OSTSdk {
 
     }
 
+    /**
+     * Class pertaining specifically to any Transaction API actions.
+     */
     object Transactions {
 
+        fun get(transaction_id: String): OSTTransaction {
+            ensureReady()
+            val urlPostfix = "/transactions/$transaction_id"
+            val response = doGet(urlPostfix, mutableMapOf())
+
+            // get the data part as an OST Action
+            val json = response.getAsJsonObject("data").getAsJsonObject("transaction")
+            return OSTTransaction.fromJson(json)
+        }
+
+        fun list(page_no: Int = 1, order: String = ORDER_DESC, limit: Int = 10): List<OSTTransaction> {
+            ensureReady()
+
+            val urlPostfix = "/transactions/"
+            val params = mutableMapOf<String, String>()
+
+            params.apply {
+                put("page_no", page_no.toString())
+                put("limit", limit.toString())
+                put("order", order)
+            }
+
+            val json = doGet(urlPostfix, params)
+
+            val transactions = mutableListOf<OSTTransaction>()
+
+            val transactionsJson = json.getAsJsonObject("data").getAsJsonArray("transactions")
+            for(transactionRaw in transactionsJson) {
+                val transactionJson = transactionRaw.asJsonObject
+                val transaction = OSTTransaction.fromJson(transactionJson)
+                transactions.add(transaction)
+            }
+
+            return transactions
+        }
+
     }
 
+    /**
+     * Class pertaining specifically to any Actions API actions.
+     */
     object Actions {
 
+        fun get(action_id: String): OSTAction {
+            ensureReady()
+            val urlPostfix = "/actions/$action_id"
+
+            val response = doGet(urlPostfix, mutableMapOf())
+            val json = response.getAsJsonObject("data").getAsJsonObject("action")
+            return OSTAction.fromJson(json)
+        }
+
+        fun execute(from_id: String, to_id: String, action_id: String, amount: Float? = null, commission_percent: Float? = null): OSTTransaction {
+            ensureReady()
+            val urlPostfix = "/transactions"
+
+            val params = mutableMapOf<String, String>()
+            params["from_user_id"] = from_id
+            params["to_user_id"] = to_id
+            params["action_id"] = action_id
+            // apply opts
+            amount?.let { params["amount"] = it.toString() }
+            commission_percent?.let { params["commission_percent"] = it.toString() }
+
+            val response = doPost(urlPostfix, params)
+            // response is a transaction
+            val json = response.getAsJsonObject("data").getAsJsonObject("transaction")
+            return OSTTransaction.fromJson(json)
+        }
+
+        fun list(page_no: Int = 1, limit: Int = 10, order_by: String = ORDER_BY_TIME, order: String = ORDER_DESC): List<OSTAction> {
+            ensureReady()
+
+            val urlPostfix = "/actions/"
+            val params = mutableMapOf<String, String>()
+
+            params.apply {
+                put("page_no", page_no.toString())
+                put("limit", limit.toString())
+                put("order_by", order_by)
+                put("order", order)
+            }
+
+            val json = doGet(urlPostfix, params)
+
+            val actions = mutableListOf<OSTAction>()
+
+            val actionsJson = json.getAsJsonObject("data").getAsJsonArray("actions")
+            for(actionRaw in actionsJson) {
+                val actionJson = actionRaw.asJsonObject
+                val action = OSTAction.fromJson(actionJson)
+                actions.add(action)
+            }
+
+            return actions
+        }
     }
+
 }
