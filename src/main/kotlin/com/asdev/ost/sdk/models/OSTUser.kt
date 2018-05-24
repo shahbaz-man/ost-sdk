@@ -31,8 +31,8 @@ data class OSTUser(
         var id: String?,
         var address: OSTAddress?,
         var name: String?,
-        var airdropped_tokens: Long,
-        var token_balance: Long) {
+        var airdropped_tokens: Double,
+        var token_balance: Double) {
 
     companion object {
 
@@ -41,8 +41,8 @@ data class OSTUser(
                     id = json["id"].asString,
                     address = OSTAddress.fromJsonArray(json["addresses"].asJsonArray),
                     name = if(json["name"].isJsonNull) null else json["name"].asString,
-                    airdropped_tokens = json["airdropped_tokens"].asString.toLong(),
-                    token_balance = json["token_balance"].asString.toLong()
+                    airdropped_tokens = json["airdropped_tokens"].asString.toDouble(),
+                    token_balance = json["token_balance"].asString.toDouble()
             )
         }
 
