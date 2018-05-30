@@ -21,7 +21,7 @@ import java.io.ByteArrayOutputStream
 
 object ApacheNetworkProvider: NetworkProvider {
 
-    private val client = HttpClientBuilder.create().build()
+    private val client = HttpClientBuilder.create().disableAutomaticRetries().build()
 
     override fun doPost(url: String, params: Map<String, String>): String {
         val request = HttpPost(url)
